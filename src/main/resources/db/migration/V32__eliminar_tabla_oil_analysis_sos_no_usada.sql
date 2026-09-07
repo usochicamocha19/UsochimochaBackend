@@ -5,8 +5,8 @@
 -- que la usara en ningún lado — mismo patrón que V31, un nivel más
 -- adentro. Sin FKs de otras tablas hacia oil_analysis_sos.
 -- No confundir con oil_change_requirements (también creada en V7):
--- esa sí está en uso vía id_requirement en vehicle_oil_changes/
--- oil_changes — no se toca aquí.
+-- es una tabla distinta, con su propia migración de retiro (V33) —
+-- no se toca aquí.
 -- ============================================================
 
 DROP TABLE IF EXISTS oil_analysis_sos;

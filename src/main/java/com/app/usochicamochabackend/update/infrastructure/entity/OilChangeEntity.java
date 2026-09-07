@@ -43,13 +43,6 @@ public class OilChangeEntity {
     @Column(name = "oil_type")
     private OilType oilType;
 
-    @ManyToOne
-    @JoinColumn(name = "id_requirement")
-    private OilChangeRequirementEntity requirement;
-
-    @Column(name = "percentage_used")
-    private Integer percentageUsed;
-
     @Builder.Default
     private Boolean status = true;
 }

@@ -1,5 +1,7 @@
 package com.app.usochicamochabackend.update.application.service;
 
+import com.app.usochicamochabackend.actions.application.port.SaveActionUseCase;
+import com.app.usochicamochabackend.auth.application.dto.UserPrincipal;
 import com.app.usochicamochabackend.common.text.InputTextNormalizer;
 import com.app.usochicamochabackend.exception.ResourceNotFoundException;
 import com.app.usochicamochabackend.notifications.application.PreventiveAlertCalculationService;
@@ -17,6 +19,7 @@ import com.app.usochicamochabackend.vehicle.infrastructure.repository.VehicleRep
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,7 @@ public class VehicleOilChangeService {
     private final BrandRepository brandRepository;
     private final OilChangeValidationService validationService;
     private final PreventiveAlertCalculationService preventiveAlertCalculationService;
+    private final SaveActionUseCase saveActionUseCase;
 
     @Transactional
     public void registerChange(VehicleOilChangeRequest request) {
@@ -102,6 +106,9 @@ public class VehicleOilChangeService {
             // Recalcular alertas de inmediato: este cambio de aceite resetea la línea base,
             // así que la alerta previa (si existía) debe desaparecer/actualizarse ya mismo.
             preventiveAlertCalculationService.calculateAndEmitAlerts();
+
+            UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            saveActionUseCase.save("El usuario " + userPrincipal.username() + " ha registrado un cambio de aceite para el vehículo " + placa);
 
             logger.info("Cambio de aceite registrado exitosamente para: {}", placa);
 
@@ -183,6 +190,10 @@ public class VehicleOilChangeService {
         }
 
         preventiveAlertCalculationService.calculateAndEmitAlerts();
+
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        saveActionUseCase.save("El usuario " + userPrincipal.username() + " ha corregido el cambio de aceite id=" + id + " del vehículo " + entity.getVehicle().getPlaca());
+
         logger.info("Cambio de aceite id={} actualizado", id);
     }
 
@@ -198,6 +209,10 @@ public class VehicleOilChangeService {
         entity.setStatus(false);
         vehicleOilChangeRepository.save(entity);
         preventiveAlertCalculationService.calculateAndEmitAlerts();
+
+        UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        saveActionUseCase.save("El usuario " + userPrincipal.username() + " ha eliminado el cambio de aceite id=" + id + " del vehículo " + entity.getVehicle().getPlaca());
+
         logger.info("Cambio de aceite id={} eliminado (soft-delete)", id);
     }
 }

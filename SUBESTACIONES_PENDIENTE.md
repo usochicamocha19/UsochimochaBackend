@@ -31,14 +31,19 @@ desde el móvil todavía.
 - Ambas migraciones sin aplicar todavía a una base real (no están en git, la raíz del
   repo no tiene `.git`).
 
-## Lo que falta y sí bloquea el MVP: `V33`
+## Lo que falta y sí bloquea el MVP: `V34`
 
 Sin esto un técnico no tiene dónde guardar una visita. No escrito todavía, a propósito
-(se dejó para quien continúe). Diseño ya cerrado, listo para pasar a SQL. (Nota: `V31` y
-`V32` quedaron tomados por limpiezas de código muerto sin relación con subestaciones —
-`V31__eliminar_modulo_mantenimiento_no_usado.sql` (módulo `maintenance` huérfano) y
-`V32__eliminar_tabla_oil_analysis_sos_no_usada.sql` (tabla sin controlador ni consumidor
-real, ni en backend ni en móvil) — ver esas migraciones si hace falta contexto.)
+(se dejó para quien continúe). Diseño ya cerrado, listo para pasar a SQL. (Nota: `V31`
+a `V33` quedaron tomados por limpiezas de código muerto sin relación con subestaciones
+(módulo `maintenance` huérfano, tabla `oil_analysis_sos` sin controlador, y
+`oil_change_requirements`/columnas `id_requirement`/`percentage_used` — propuesta que
+nunca se conectó) — ver esas migraciones si hace falta contexto. Un intento de borrar
+`cat_areas`/`CatalogController`/`MarcaModeloController` como "código muerto" se revirtió
+el mismo día: el front sí los usa — `stores/data/catalog.js`, llamado desde
+`MotoManagement.svelte`/`VehicleManagement.svelte` — la búsqueda que los marcó como
+muertos solo cubrió `front/.../src/`, no la raíz real del proyecto donde viven
+`stores/`/`components/`. Ver [[memoria]] de esta sesión si hace falta el detalle.)
 
 ```sql
 CREATE TABLE mant_ejecucion (
@@ -80,12 +85,12 @@ CREATE TABLE mant_evidencia (
 ```
 
 Civil no usa `mant_ejecucion_conjunto`/`mant_ejecucion_elemento` — no hace falta crearlas
-en este `V33`, solo cuando se retome Eléctrico (ver abajo).
+en este `V34`, solo cuando se retome Eléctrico (ver abajo).
 
 ## Habilitar Eléctrico o Electromecánico después: aditivo, no reestructuración
 
 Con una excepción ya resuelta arriba (el `CHECK` de `tipo_actividad` ya trae los 4
-valores desde `V33`, así que no hace falta un `ALTER` después) y una pendiente de
+valores desde `V34`, así que no hace falta un `ALTER` después) y una pendiente de
 confirmar (equipos de Electromecánico, siguiente sección), todo lo demás es agregar,
 no modificar:
 
@@ -147,6 +152,6 @@ en `mant_actividad` (solo vive en `mant_ejecucion`, es un dato de la ejecución,
 catálogo), `cantidad_programada` en `mant_programacion` (cada cita es una fila, no un
 contador), y se renombró `activo`→`status` en todas las tablas para que coincida con la
 convención del proyecto. **Sigue faltando** agregarle la columna `provisional` a
-`mant_elemento` en el diagrama (sí existe en `V29`) y las tablas de `V33` completas
+`mant_elemento` en el diagrama (sí existe en `V29`) y las tablas de `V34` completas
 (`mant_ejecucion` ya está dibujada con el campo viejo, falta agregarle
 `motivo_no_catalogado`) — pendiente para quien edite el diagrama de nuevo.
