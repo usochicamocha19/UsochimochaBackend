@@ -22,7 +22,6 @@ public class FuelReintegrationController {
     private final RegisterFuelReintegrationUseCase registerFuelReintegrationUseCase;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<FuelReintegrationResponse> registrar(@RequestBody FuelReintegrationRequest request) {
         UserPrincipal userPrincipal = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         FuelReintegrationResponse response = registerFuelReintegrationUseCase.registrar(request, userPrincipal.id());

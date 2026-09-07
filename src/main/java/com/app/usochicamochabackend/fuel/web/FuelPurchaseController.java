@@ -30,7 +30,6 @@ public class FuelPurchaseController {
     private final RegisterFuelPurchaseUseCase registerFuelPurchaseUseCase;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<FuelPurchaseResponse> registrar(
             @RequestPart("areaCosto") String areaCosto,
             @RequestPart("fuelTypeId") String fuelTypeId,
@@ -53,7 +52,6 @@ public class FuelPurchaseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ALMACEN', 'SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<Page<FuelPurchaseResponse>> listar(
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(registerFuelPurchaseUseCase.listar(pageable));

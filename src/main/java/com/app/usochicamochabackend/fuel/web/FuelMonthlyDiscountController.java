@@ -22,7 +22,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/fuel/monthly-discount")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
 public class FuelMonthlyDiscountController {
 
     private final ManageFuelMonthlyDiscountUseCase manageFuelMonthlyDiscountUseCase;

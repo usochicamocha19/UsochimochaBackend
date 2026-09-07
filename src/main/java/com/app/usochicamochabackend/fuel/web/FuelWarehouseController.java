@@ -22,13 +22,11 @@ public class FuelWarehouseController {
     private final GetFuelWarehouseUseCase getFuelWarehouseUseCase;
 
     @GetMapping("/saldos")
-    @PreAuthorize("hasAnyRole('ALMACEN', 'SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<FuelWarehouseBalanceResponse> saldos() {
         return ResponseEntity.ok(getFuelWarehouseUseCase.obtenerSaldos());
     }
 
     @GetMapping("/movimientos")
-    @PreAuthorize("hasAnyRole('ALMACEN', 'SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<FuelWarehouseMovementsResponse> movimientos(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {

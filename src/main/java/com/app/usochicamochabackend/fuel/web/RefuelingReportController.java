@@ -27,7 +27,6 @@ public class RefuelingReportController {
     private final ExportRefuelingReportUseCase exportRefuelingReportUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<List<RefuelingRecordResponse>> reporte(
             @RequestParam String tipo,
             @RequestParam(required = false) String area,
@@ -39,13 +38,11 @@ public class RefuelingReportController {
     // Un solo tanqueo (por id) con el mismo enriquecimiento del reporte — evita traer
     // todo el reporte del tipo solo para abrir el modal de editar un registro puntual.
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<RefuelingRecordResponse> reportePorId(@PathVariable Long id) {
         return ResponseEntity.ok(getRefuelingReportUseCase.obtenerPorId(id));
     }
 
     @GetMapping("/export")
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<byte[]> exportar(
             @RequestParam String tipo,
             @RequestParam(required = false) String area,
