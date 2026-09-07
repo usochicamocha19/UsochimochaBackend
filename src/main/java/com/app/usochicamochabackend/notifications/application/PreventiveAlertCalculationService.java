@@ -7,7 +7,6 @@ import com.app.usochicamochabackend.shared.calculator.DocumentAlertCalculator;
 import com.app.usochicamochabackend.shared.calculator.OilChangeMachineAlertCalculator;
 import com.app.usochicamochabackend.shared.calculator.OilChangeVehicleAlertCalculator;
 import com.app.usochicamochabackend.update.infrastructure.entity.OilChangeEntity;
-import com.app.usochicamochabackend.update.infrastructure.entity.OilChangeRequirementEntity;
 import com.app.usochicamochabackend.update.infrastructure.repository.OilChangeRepository;
 import com.app.usochicamochabackend.update.infrastructure.repository.VehicleOilChangeRepository;
 import com.app.usochicamochabackend.vehicle.infrastructure.entity.VehicleEntity;
@@ -286,7 +285,7 @@ public class PreventiveAlertCalculationService {
     private void calculateMachineOilAlert(MachineEntity machine, boolean isMotorOil) {
         String oilType = isMotorOil ? "MOTOR" : "HYDRAULIC";
 
-        // IMPORTANTE: Usar el horómetro de la ÚLTIMA INSPECCIÓN (como lo hace MachineMonitoringService)
+        // IMPORTANTE: Usar el horómetro de la ÚLTIMA INSPECCIÓN
         var lastInspection = inspectionRepository.getLastInspection(machine.getId());
         Integer horometroActual = (lastInspection != null && lastInspection.getHourMeter() != null)
             ? lastInspection.getHourMeter().intValue()
