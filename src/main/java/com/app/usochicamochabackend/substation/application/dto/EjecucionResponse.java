@@ -26,9 +26,14 @@ public record EjecucionResponse(
         String descripcionLibre,
         String responsable,
         UUID uuidCliente,
-        List<EvidenciaResponse> evidencias
+        List<EvidenciaResponse> evidencias,
+        @Schema(description = "true si el resultado no es CONFORME y todavía no tiene ninguna evidencia adjunta")
+        Boolean evidenciaPendiente,
+        @Schema(description = "Historial de ediciones, orden cronológico") List<EjecucionEdicionResponse> ediciones
 ) {
-    public static EjecucionResponse fromEntity(EjecucionEntity entity, List<EvidenciaResponse> evidencias) {
+    public static EjecucionResponse fromEntity(
+            EjecucionEntity entity, List<EvidenciaResponse> evidencias, List<EjecucionEdicionResponse> ediciones) {
+        boolean evidenciaPendiente = !"CONFORME".equals(entity.getResultado()) && evidencias.isEmpty();
         return new EjecucionResponse(
                 entity.getId(),
                 entity.getFecha(),
@@ -48,6 +53,8 @@ public record EjecucionResponse(
                 entity.getDescripcionLibre(),
                 entity.getUsuario().getUsername(),
                 entity.getUuidCliente(),
-                evidencias);
+                evidencias,
+                evidenciaPendiente,
+                ediciones);
     }
 }

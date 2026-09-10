@@ -18,4 +18,6 @@ public interface EjecucionRepository extends JpaRepository<EjecucionEntity, Long
     Page<EjecucionEntity> findByEstacion_IdAndFechaBetween(Long estacionId, LocalDate desde, LocalDate hasta, Pageable pageable);
 
     Page<EjecucionEntity> findByProgramacion_Id(Long programacionId, Pageable pageable);
+
+    Optional<EjecucionEntity> findFirstByProgramacion_IdOrderByIdDesc(Long programacionId);
 }

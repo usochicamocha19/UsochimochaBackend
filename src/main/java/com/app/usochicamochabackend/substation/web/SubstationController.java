@@ -3,6 +3,7 @@ package com.app.usochicamochabackend.substation.web;
 import com.app.usochicamochabackend.auth.application.dto.UserPrincipal;
 import com.app.usochicamochabackend.substation.application.dto.ActividadResponse;
 import com.app.usochicamochabackend.substation.application.dto.CumplimientoResponse;
+import com.app.usochicamochabackend.substation.application.dto.EjecucionEditRequest;
 import com.app.usochicamochabackend.substation.application.dto.EjecucionRequest;
 import com.app.usochicamochabackend.substation.application.dto.EjecucionResponse;
 import com.app.usochicamochabackend.substation.application.dto.EstacionResponse;
@@ -72,6 +73,16 @@ public class SubstationController {
         return ResponseEntity.created(new URI("/api/v1/substation/ejecuciones/" + saved.id())).body(saved);
     }
 
+    @PutMapping(path = "/ejecuciones/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Corregir una ejecución ya registrada", description = "Exige motivoEdicion (mínimo 15 caracteres); queda en el historial del registro. No permite cambiar estación, disciplina ni la cita de programación asociada.")
+    public ResponseEntity<EjecucionResponse> editarEjecucion(
+            @PathVariable Long id,
+            @RequestBody EjecucionEditRequest request,
+            Authentication authentication) {
+        UserPrincipal usuario = (UserPrincipal) authentication.getPrincipal();
+        return ResponseEntity.ok(ejecucionUseCase.editarEjecucion(id, request, usuario));
+    }
+
     @PostMapping(path = "/ejecuciones/{id}/evidencia", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Subir una foto de evidencia para una ejecución ya registrada")
     public ResponseEntity<EvidenciaResponse> agregarEvidencia(
@@ -84,6 +95,12 @@ public class SubstationController {
     @Operation(summary = "Detalle de una ejecución, con sus evidencias")
     public ResponseEntity<EjecucionResponse> obtenerEjecucion(@PathVariable Long id) {
         return ResponseEntity.ok(ejecucionUseCase.obtenerEjecucion(id));
+    }
+
+    @GetMapping("/ejecuciones/por-programacion/{programacionId}")
+    @Operation(summary = "Ejecución registrada para una cita del cronograma", description = "Para 'ver detalle' desde una cita ya marcada como cumplida en el cronograma.")
+    public ResponseEntity<EjecucionResponse> obtenerEjecucionPorProgramacion(@PathVariable Long programacionId) {
+        return ResponseEntity.ok(ejecucionUseCase.obtenerEjecucionPorProgramacion(programacionId));
     }
 
     @GetMapping("/ejecuciones")

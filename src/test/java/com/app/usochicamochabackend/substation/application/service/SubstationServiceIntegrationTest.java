@@ -5,6 +5,7 @@ import com.app.usochicamochabackend.auth.infrastructure.entity.UserEntity;
 import com.app.usochicamochabackend.auth.infrastructure.repository.UserRepositoryJpa;
 import com.app.usochicamochabackend.exception.BadRequestException;
 import com.app.usochicamochabackend.substation.application.dto.CumplimientoResponse;
+import com.app.usochicamochabackend.substation.application.dto.EjecucionEditRequest;
 import com.app.usochicamochabackend.substation.application.dto.EjecucionRequest;
 import com.app.usochicamochabackend.substation.application.dto.EjecucionResponse;
 import com.app.usochicamochabackend.substation.application.dto.EstacionResponse;
@@ -156,7 +157,7 @@ class SubstationServiceIntegrationTest {
         EjecucionRequest request = new EjecucionRequest(
                 LocalDate.now(), 9, 1, estacionId, "CIVIL",
                 "NO_PROGRAMADO", "MANTENIMIENTO",
-                null, null, "OTRO",
+                null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "algo no catalogado",
                 uuidCliente);
 
@@ -172,10 +173,11 @@ class SubstationServiceIntegrationTest {
         EjecucionRequest request = new EjecucionRequest(
                 LocalDate.now(), 9, 1, estacionId, "CIVIL",
                 "NO_PROGRAMADO", "INSPECCION",
-                null, null, "OTRO",
+                null, null, "NO_PROGRAMADO",
                 "CON_HALLAZGOS", "obs", "revision de rutina",
                 UUID.randomUUID());
         EjecucionResponse ejecucion = ejecucionUseCase.registrarEjecucion(request, usuario);
+        assertTrue(ejecucion.evidenciaPendiente());
 
         MockMultipartFile foto = new MockMultipartFile("file", "foto.jpg", "image/jpeg", new byte[]{1, 2, 3, 4});
         var evidencia = ejecucionUseCase.agregarEvidencia(ejecucion.id(), foto);
@@ -185,6 +187,98 @@ class SubstationServiceIntegrationTest {
 
         EjecucionResponse detalle = ejecucionUseCase.obtenerEjecucion(ejecucion.id());
         assertEquals(1, detalle.evidencias().size());
+        assertFalse(detalle.evidenciaPendiente());
+    }
+
+    @Test
+    void registrarEjecucion_rechazaTipoActividadOtroParaCivil() {
+        Long estacionId = buscarEstacionIdPorNombre("Duitama");
+        EjecucionRequest request = new EjecucionRequest(
+                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                "NO_PROGRAMADO", "OTRO",
+                null, null, "NO_PROGRAMADO",
+                "CONFORME", "obs", "algo",
+                UUID.randomUUID());
+
+        assertThrows(BadRequestException.class, () -> ejecucionUseCase.registrarEjecucion(request, usuario));
+    }
+
+    @Test
+    void registrarEjecucion_rechazaMotivoNoCatalogadoOtroParaCivil() {
+        Long estacionId = buscarEstacionIdPorNombre("Duitama");
+        EjecucionRequest request = new EjecucionRequest(
+                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                "NO_PROGRAMADO", "MANTENIMIENTO",
+                null, null, "OTRO",
+                "CONFORME", "obs", "algo no catalogado",
+                UUID.randomUUID());
+
+        assertThrows(BadRequestException.class, () -> ejecucionUseCase.registrarEjecucion(request, usuario));
+    }
+
+    @Test
+    void editarEjecucion_actualizaCamposYQuedaEnElHistorial() {
+        Long estacionId = buscarEstacionIdPorNombre("Duitama");
+        EjecucionRequest request = new EjecucionRequest(
+                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                "NO_PROGRAMADO", "INSPECCION",
+                null, null, "NO_PROGRAMADO",
+                "CON_HALLAZGOS", "obs original", "revision de rutina",
+                UUID.randomUUID());
+        EjecucionResponse creada = ejecucionUseCase.registrarEjecucion(request, usuario);
+
+        var edicion = new EjecucionEditRequest(
+                creada.fecha(), creada.mesEjecucion(), creada.semanaEjecucion(),
+                "NO_PROGRAMADO", "INSPECCION", null, "NO_PROGRAMADO",
+                "CONFORME", "obs corregida tras revisar de nuevo", "revision de rutina, sin novedades",
+                "Se corrigió el resultado: se había marcado con hallazgos por error.");
+
+        EjecucionResponse editada = ejecucionUseCase.editarEjecucion(creada.id(), edicion, usuario);
+
+        assertEquals("CONFORME", editada.resultado());
+        assertEquals("obs corregida tras revisar de nuevo", editada.observaciones());
+        assertEquals(1, editada.ediciones().size());
+        assertEquals("tecnico.test", editada.ediciones().get(0).usuario());
+        assertTrue(editada.ediciones().get(0).motivo().contains("hallazgos por error"));
+    }
+
+    @Test
+    void editarEjecucion_exigeMotivoDeAlMenos15Caracteres() {
+        Long estacionId = buscarEstacionIdPorNombre("Duitama");
+        EjecucionRequest request = new EjecucionRequest(
+                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                "NO_PROGRAMADO", "INSPECCION",
+                null, null, "NO_PROGRAMADO",
+                "CONFORME", "obs", "algo",
+                UUID.randomUUID());
+        EjecucionResponse creada = ejecucionUseCase.registrarEjecucion(request, usuario);
+
+        var edicionCorta = new EjecucionEditRequest(
+                creada.fecha(), creada.mesEjecucion(), creada.semanaEjecucion(),
+                "NO_PROGRAMADO", "INSPECCION", null, "NO_PROGRAMADO",
+                "CONFORME", "obs", "algo", "muy corto");
+
+        assertThrows(BadRequestException.class, () -> ejecucionUseCase.editarEjecucion(creada.id(), edicionCorta, usuario));
+    }
+
+    @Test
+    void obtenerEjecucionPorProgramacion_devuelveLaEjecucionDeEsaCita() {
+        Long estacionId = buscarEstacionIdPorNombre("Duitama");
+        var cita = catalogUseCase.listarProgramacion(estacionId, 2026, 2, "CIVIL").stream()
+                .filter(c -> c.actividadNombre().equals("Inspección y mantenimiento compuertas + limpieza pozos succión"))
+                .findFirst()
+                .orElseThrow();
+
+        EjecucionRequest request = new EjecucionRequest(
+                LocalDate.of(2026, 2, 15), 2, 3, estacionId, "CIVIL",
+                "PREVENTIVO", "MANTENIMIENTO",
+                cita.actividadId(), cita.id(), null,
+                "CONFORME", "Compuertas limpias y lubricadas.", null,
+                UUID.randomUUID());
+        EjecucionResponse creada = ejecucionUseCase.registrarEjecucion(request, usuario);
+
+        EjecucionResponse encontrada = ejecucionUseCase.obtenerEjecucionPorProgramacion(cita.id());
+        assertEquals(creada.id(), encontrada.id());
     }
 
     @Test
@@ -193,7 +287,7 @@ class SubstationServiceIntegrationTest {
         EjecucionRequest request = new EjecucionRequest(
                 LocalDate.of(2026, 3, 1), 3, 1, estacionId, "CIVIL",
                 "NO_PROGRAMADO", "INSPECCION",
-                null, null, "OTRO",
+                null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "algo",
                 UUID.randomUUID());
         ejecucionUseCase.registrarEjecucion(request, usuario);
