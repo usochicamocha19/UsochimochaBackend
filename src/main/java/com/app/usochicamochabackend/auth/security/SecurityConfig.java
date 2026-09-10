@@ -88,6 +88,11 @@ public class SecurityConfig {
                     http.requestMatchers(HttpMethod.PUT, "/api/v1/moto/inspeccion/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
                     http.requestMatchers(HttpMethod.POST, "/api/v1/inspection/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
 
+                    // 4b. Subestaciones (mantenimiento Civil/Eléctrico/Electromecánico)
+                    http.requestMatchers(HttpMethod.GET, "/api/v1/substation/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
+                    http.requestMatchers(HttpMethod.POST, "/api/v1/substation/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
+                    http.requestMatchers(HttpMethod.PUT, "/api/v1/substation/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
+
                     // Lecturas de inspección (móvil + supervisor + admin)
                     http.requestMatchers(HttpMethod.GET, "/api/v1/inspection/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
                     http.requestMatchers(HttpMethod.GET, "/api/v1/vehicle-inspection/documentos/**").hasAnyRole("OPERARIO", "SUPERVISOR_OPERATIVO", "ADMIN");
