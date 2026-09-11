@@ -274,11 +274,21 @@ public class SubstationService implements SubstationCatalogUseCase, SubstationEj
     }
 
     @Override
-    public Page<EjecucionResponse> listarEjecuciones(Long estacionId, LocalDate fechaInicio, LocalDate fechaFin, Pageable pageable) {
+    public Page<EjecucionResponse> listarEjecuciones(
+            Long estacionId, LocalDate fechaInicio, LocalDate fechaFin, Boolean esProgramada, Pageable pageable) {
         LocalDate desde = fechaInicio != null ? fechaInicio : LocalDate.of(2000, 1, 1);
         LocalDate hasta = fechaFin != null ? fechaFin : LocalDate.now();
-        return ejecucionRepository.findByEstacion_IdAndFechaBetween(estacionId, desde, hasta, pageable)
-                .map(this::toResponse);
+        Page<EjecucionEntity> pagina;
+        if (estacionId != null) {
+            pagina = esProgramada != null
+                    ? ejecucionRepository.findByEstacion_IdAndFechaBetweenAndEsProgramada(estacionId, desde, hasta, esProgramada, pageable)
+                    : ejecucionRepository.findByEstacion_IdAndFechaBetween(estacionId, desde, hasta, pageable);
+        } else {
+            pagina = esProgramada != null
+                    ? ejecucionRepository.findByFechaBetweenAndEsProgramada(desde, hasta, esProgramada, pageable)
+                    : ejecucionRepository.findByFechaBetween(desde, hasta, pageable);
+        }
+        return pagina.map(this::toResponse);
     }
 
     private EjecucionResponse toResponse(EjecucionEntity entity) {

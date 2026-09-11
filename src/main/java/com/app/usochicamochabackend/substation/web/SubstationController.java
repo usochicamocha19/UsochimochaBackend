@@ -104,13 +104,16 @@ public class SubstationController {
     }
 
     @GetMapping("/ejecuciones")
-    @Operation(summary = "Listado de ejecuciones por estación y rango de fecha")
+    @Operation(summary = "Listado de ejecuciones por rango de fecha",
+            description = "Sin estacionId: todas las estaciones. Con estacionId: solo esa estación. "
+                    + "esProgramada es opcional (ej. false para traer solo actividades no previstas).")
     public ResponseEntity<Page<EjecucionResponse>> listarEjecuciones(
-            @RequestParam Long estacionId,
+            @RequestParam(required = false) Long estacionId,
             @RequestParam(required = false) LocalDate fechaInicio,
             @RequestParam(required = false) LocalDate fechaFin,
+            @RequestParam(required = false) Boolean esProgramada,
             Pageable pageable) {
-        return ResponseEntity.ok(ejecucionUseCase.listarEjecuciones(estacionId, fechaInicio, fechaFin, pageable));
+        return ResponseEntity.ok(ejecucionUseCase.listarEjecuciones(estacionId, fechaInicio, fechaFin, esProgramada, pageable));
     }
 
     @GetMapping("/indicadores/cumplimiento")

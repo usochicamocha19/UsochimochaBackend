@@ -27,5 +27,12 @@ public interface SubstationEjecucionUseCase {
     /** Para "ver detalle" desde una cita del cronograma ya cumplida. */
     EjecucionResponse obtenerEjecucionPorProgramacion(Long programacionId);
 
-    Page<EjecucionResponse> listarEjecuciones(Long estacionId, LocalDate fechaInicio, LocalDate fechaFin, Pageable pageable);
+    /**
+     * Listado de ejecuciones. {@code estacionId} es opcional: si es null, trae de todas las
+     * estaciones para el rango de fechas dado (mismo patrón que
+     * {@link SubstationIndicadoresUseCase#cumplimientoPorMes}). {@code esProgramada} es
+     * opcional: si es null, no filtra por ese campo.
+     */
+    Page<EjecucionResponse> listarEjecuciones(
+            Long estacionId, LocalDate fechaInicio, LocalDate fechaFin, Boolean esProgramada, Pageable pageable);
 }
