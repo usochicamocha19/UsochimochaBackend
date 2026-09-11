@@ -2,7 +2,6 @@ package com.app.usochicamochabackend.update.application.service;
 
 import com.app.usochicamochabackend.context.application.dto.MachineCurriculumDTO;
 import com.app.usochicamochabackend.context.application.dto.VehicleCurriculumDTO;
-import com.app.usochicamochabackend.maintenance.application.dto.MaintenanceResponse;
 import com.app.usochicamochabackend.moto.application.dto.MotoMonitoringDTO;
 import com.app.usochicamochabackend.order.application.dto.OrderWithMachineDTO;
 import com.app.usochicamochabackend.order.application.dto.OrderWithVehicleDTO;
@@ -707,75 +706,6 @@ public class ExcelGenerationService {
                 row.createCell(c++).setCellValue(vehicle != null && vehicle.fechaInspeccion() != null ? vehicle.fechaInspeccion().format(DATETIME_FORMATTER) : "");
                 row.createCell(c++).setCellValue(order != null && order.suppliers() != null ? order.suppliers() : "");
                 row.createCell(c++).setCellValue(formatExecutionTime(order));
-
-                for (int i = 0; i < headers.length; i++) {
-                    row.getCell(i).setCellStyle(dataStyle);
-                }
-            }
-
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-                if (sheet.getColumnWidth(i) < 3000) sheet.setColumnWidth(i, 3000);
-                if (sheet.getColumnWidth(i) > 8000) sheet.setColumnWidth(i, 8000);
-            }
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            return out.toByteArray();
-        }
-    }
-
-    public byte[] generateMaintenanceExcel(List<MaintenanceResponse> records) throws IOException {
-        log.info("Generando Excel de mantenimiento: {} registros", records.size());
-
-        try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Mantenimiento");
-
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerFont.setColor(IndexedColors.WHITE.getIndex());
-            headerStyle.setFont(headerFont);
-            headerStyle.setFillForegroundColor(IndexedColors.BLUE.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            headerStyle.setAlignment(HorizontalAlignment.CENTER);
-            headerStyle.setBorderBottom(BorderStyle.THIN);
-            headerStyle.setBorderTop(BorderStyle.THIN);
-            headerStyle.setBorderRight(BorderStyle.THIN);
-            headerStyle.setBorderLeft(BorderStyle.THIN);
-
-            CellStyle dataStyle = workbook.createCellStyle();
-            dataStyle.setBorderBottom(BorderStyle.THIN);
-            dataStyle.setBorderTop(BorderStyle.THIN);
-            dataStyle.setBorderRight(BorderStyle.THIN);
-            dataStyle.setBorderLeft(BorderStyle.THIN);
-
-            String[] headers = {
-                "Fecha", "Placa", "Ubicación", "Responsable Asignado",
-                "Kilometraje", "Tipo Mantenimiento", "Repuestos",
-                "Taller Responsable", "Observaciones"
-            };
-
-            Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(headerStyle);
-            }
-
-            int rowNum = 1;
-            for (MaintenanceResponse r : records) {
-                Row row = sheet.createRow(rowNum++);
-                int c = 0;
-                row.createCell(c++).setCellValue(r.fecha() != null ? r.fecha().format(DATETIME_FORMATTER) : "");
-                row.createCell(c++).setCellValue(r.placa() != null ? r.placa() : "");
-                row.createCell(c++).setCellValue(r.ubicacion() != null ? r.ubicacion() : "");
-                row.createCell(c++).setCellValue(r.responsableAsignado() != null ? r.responsableAsignado() : "");
-                row.createCell(c++).setCellValue(r.kilometraje() != null ? r.kilometraje() : 0);
-                row.createCell(c++).setCellValue(r.tipoMantenimiento() != null ? r.tipoMantenimiento() : "");
-                row.createCell(c++).setCellValue(r.repuestosMantenimiento() != null ? r.repuestosMantenimiento() : "");
-                row.createCell(c++).setCellValue(r.tallerResponsable() != null ? r.tallerResponsable() : "");
-                row.createCell(c++).setCellValue(r.observaciones() != null ? r.observaciones() : "");
 
                 for (int i = 0; i < headers.length; i++) {
                     row.getCell(i).setCellStyle(dataStyle);

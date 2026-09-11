@@ -30,7 +30,7 @@ public class OilChangeMachineAlertCalculator {
      * Datos de entrada:
      * - horasActual: horómetro actual (MachineEntity.horometroActual)
      * - hourStamp: horas cuando se hizo el último cambio (OilChangeEntity.hourStamp)
-     * - hourRange: intervalo entre cambios en horas (OilChangeRequirementEntity.hourRange)
+     * - hourRange: intervalo entre cambios en horas
      * - oilType: "MOTOR" o "HYDRAULIC" (para el mensaje)
      */
     public static Result calculateOilChangeAlert(

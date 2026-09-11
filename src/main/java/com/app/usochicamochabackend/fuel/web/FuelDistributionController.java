@@ -21,7 +21,6 @@ public class FuelDistributionController {
     private final GetFuelDistributionUseCase getFuelDistributionUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<FuelDistributionResponse> distribucion(
             @RequestParam(required = false) String area,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,

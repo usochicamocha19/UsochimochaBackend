@@ -24,7 +24,6 @@ public class FuelDashboardController {
     private final GetFuelDashboardUseCase getFuelDashboardUseCase;
 
     @GetMapping("/financiero")
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<FuelDashboardResponse> financiero(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
@@ -32,7 +31,6 @@ public class FuelDashboardController {
     }
 
     @GetMapping("/tendencia")
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")    
     public ResponseEntity<List<FuelTrendResponse>> tendencia(
             @RequestParam(required = false) Integer meses,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
@@ -40,7 +38,6 @@ public class FuelDashboardController {
     }
 
     @GetMapping("/proyeccion")
-    @PreAuthorize("hasAnyRole('SUPERVISOR_OPERATIVO', 'ADMIN')")
     public ResponseEntity<List<FuelBudgetProjectionRow>> proyeccion(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
         return ResponseEntity.ok(getFuelDashboardUseCase.obtenerProyeccionPresupuestal(fechaFin));

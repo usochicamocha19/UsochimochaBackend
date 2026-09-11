@@ -1,5 +1,6 @@
 package com.app.usochicamochabackend.vehicleinspection.application.service;
 
+import com.app.usochicamochabackend.actions.application.port.SaveActionUseCase;
 import com.app.usochicamochabackend.auth.application.dto.UserPrincipal;
 import com.app.usochicamochabackend.catalog.infrastructure.repository.UbicacionRepository;
 import com.app.usochicamochabackend.common.text.InputTextNormalizer;
@@ -60,6 +61,7 @@ public class VehiculoInspectionService implements CreateVehiculoInspectionUseCas
     private final VehicleDocumentStorageService vehicleDocumentStorageService;
     private final NotificationService notificationService;
     private final PreventiveAlertCalculationService preventiveAlertCalculationService;
+    private final SaveActionUseCase saveActionUseCase;
 
     /**
      * POST — Guarda la inspección pre-operativa en las 5 tablas de inspección
@@ -166,6 +168,8 @@ public class VehiculoInspectionService implements CreateVehiculoInspectionUseCas
         // el umbral de cambio de aceite.
         preventiveAlertCalculationService.calculateAndEmitAlerts();
         notificationService.notifyDataUpdate(updateEvent);
+
+        saveActionUseCase.save("El usuario " + inspector.username() + " ha registrado una inspección para el vehículo " + placaNorm);
 
         return new VehiculoInspectionResponse(idInspeccion, "Inspección guardada exitosamente");
     }
@@ -551,6 +555,9 @@ public class VehiculoInspectionService implements CreateVehiculoInspectionUseCas
         // a un refresh manual), para que la alerta de este documento desaparezca/actualice
         // apenas se guarda la nueva fecha de vencimiento.
         preventiveAlertCalculationService.calculateAndEmitAlerts();
+
+        saveActionUseCase.save("El usuario " + doc.getRegistradoPor() + " ha guardado el documento " + tipo
+                + " del vehículo id=" + req.idVehiculo());
     }
 
     @Transactional

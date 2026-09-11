@@ -1,5 +1,7 @@
 package com.app.usochicamochabackend.update.application.service;
 
+import com.app.usochicamochabackend.actions.application.port.SaveActionUseCase;
+import com.app.usochicamochabackend.auth.application.dto.UserPrincipal;
 import com.app.usochicamochabackend.exception.ResourceNotFoundException;
 import com.app.usochicamochabackend.notifications.application.PreventiveAlertCalculationService;
 import com.app.usochicamochabackend.update.application.dto.VehicleOilChangeHistoryDTO;
@@ -10,11 +12,16 @@ import com.app.usochicamochabackend.update.infrastructure.repository.BrandReposi
 import com.app.usochicamochabackend.update.infrastructure.repository.VehicleOilChangeRepository;
 import com.app.usochicamochabackend.vehicle.infrastructure.entity.VehicleEntity;
 import com.app.usochicamochabackend.vehicle.infrastructure.repository.VehicleRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +49,9 @@ class VehicleOilChangeServiceTest {
     @Mock
     private PreventiveAlertCalculationService preventiveAlertCalculationService;
 
+    @Mock
+    private SaveActionUseCase saveActionUseCase;
+
     private VehicleOilChangeService vehicleOilChangeService;
 
     @BeforeEach
@@ -49,7 +59,17 @@ class VehicleOilChangeServiceTest {
         OilChangeValidationService validationService = new OilChangeValidationService();
         vehicleOilChangeService = new VehicleOilChangeService(
                 vehicleOilChangeRepository, vehicleRepository, brandRepository, validationService,
-                preventiveAlertCalculationService);
+                preventiveAlertCalculationService, saveActionUseCase);
+
+        UserPrincipal principal = new UserPrincipal(1L, "tecnico");
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                principal, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     private VehicleOilChangeRequest requestValido() {

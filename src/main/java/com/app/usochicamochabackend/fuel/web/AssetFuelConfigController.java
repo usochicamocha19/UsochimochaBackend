@@ -18,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/fuel/config")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class AssetFuelConfigController {
 
     private final ManageAssetFuelConfigUseCase manageAssetFuelConfigUseCase;
