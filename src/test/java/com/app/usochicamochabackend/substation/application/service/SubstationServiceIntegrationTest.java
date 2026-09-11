@@ -38,9 +38,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -50,13 +48,20 @@ import static org.junit.jupiter.api.Assertions.*;
  * Prueba de integración real contra el esquema H2 (modo PostgreSQL). El perfil `test`
  * real (application-test.properties) corre con Flyway deshabilitado y
  * spring.jpa.hibernate.ddl-auto=create-drop: el esquema lo genera Hibernate a partir de
- * las entidades JPA, no las migraciones V29/V30/V34-V38. Por eso este @BeforeEach siembra
- * sus propios datos REALES (no inventados) vía los repositorios JPA — 23 estaciones, las
- * 9 actividades CIVIL capturables y su programación 2026 — transcritos 1:1 desde
- * V30__mantenimiento_subestaciones_catalogos_seed.sql (con la corrección de V35 ya
- * aplicada: en el V30 vigente en el repo las 9 CIVIL ya nacen con
- * captura_movil_habilitada=TRUE, V35 es un no-op sobre un seed nuevo). Ver también
- * prepararVistasH2SoloUnaVez() para cómo se resuelven las vistas SQL de V37 bajo H2.
+ * las entidades JPA, no las migraciones V29/V30/V34-V38.
+ *
+ * <p>Este test es deliberadamente INDEPENDIENTE del contenido del seeder de producción
+ * (V30__mantenimiento_subestaciones_catalogos_seed.sql): ese seeder todavía no está
+ * terminado/definitivo — la siembra real de datos de producción se hará de forma manual
+ * más adelante — así que la lógica de negocio que se prueba aquí no debe depender de
+ * cuántas estaciones/actividades reales existan hoy ni de sus nombres. El
+ * {@code @BeforeEach} siembra, vía los repositorios JPA, un fixture SINTÉTICO mínimo y
+ * arbitrario (estaciones y actividades con nombres inventados tipo "Estación Test Uno");
+ * cada {@code @Test} agrega encima la programación puntual que necesita para ejercitar su
+ * camino de lógica. Las aserciones verifican comportamiento (filtrado, idempotencia,
+ * cálculo de cumplimiento, etc.), no conteos que coincidan con el seed real. Ver también
+ * prepararVistasH2SoloUnaVez() para cómo se resuelven las vistas SQL de V37 bajo H2 — eso
+ * sí es infraestructura de test legítima, no tiene relación con el seeder.
  */
 @SpringBootTest
 @Transactional
@@ -94,6 +99,14 @@ class SubstationServiceIntegrationTest {
     private EntityManager entityManager;
 
     private UserPrincipal usuario;
+    private DisciplinaEntity civil;
+
+    /** Fixture base sintético: 3 estaciones y 2 actividades CIVIL capturables, con nombres inventados. */
+    private EstacionEntity estacionUno;
+    private EstacionEntity estacionDos;
+    private EstacionEntity estacionTres;
+    private ActividadEntity actividadUno;
+    private ActividadEntity actividadDos;
 
     /**
      * v_mant_cumplimiento / v_mant_indicadores_estacion / v_mant_resumen_actividad (V37)
@@ -121,10 +134,14 @@ class SubstationServiceIntegrationTest {
                 .build());
         usuario = new UserPrincipal(user.getId(), user.getUsername());
 
-        DisciplinaEntity civil = disciplinaRepository.save(DisciplinaEntity.builder().codigo("CIVIL").build());
-        Map<String, EstacionEntity> estaciones = sembrarEstaciones();
-        Map<String, ActividadEntity> actividades = sembrarActividadesCivilesCapturables(civil);
-        sembrarProgramacionCivil2026(estaciones, actividades);
+        civil = disciplinaRepository.save(DisciplinaEntity.builder().codigo("CIVIL").build());
+
+        estacionUno = crearEstacion("Estación Test Uno");
+        estacionDos = crearEstacion("Estación Test Dos");
+        estacionTres = crearEstacion("Estación Test Tres");
+
+        actividadUno = crearActividadCivilCapturable("Actividad Civil Capturable Uno");
+        actividadDos = crearActividadCivilCapturable("Actividad Civil Capturable Dos");
     }
 
     private void prepararVistasH2SoloUnaVez() throws SQLException {
@@ -238,215 +255,108 @@ class SubstationServiceIntegrationTest {
         }
     }
 
-    /** 23 estaciones reales — V30, hoja MAESTRO_ESTACIONES. Claves en MAYÚSCULAS para casar con los nombres usados abajo en la programación (igual que el UPPER(nombre) de V30). */
-    private Map<String, EstacionEntity> sembrarEstaciones() {
-        String[][] datos = {
-                {"Ayalas", "BOMBEO", "TRIMESTRAL"},
-                {"CLAN", "COMPLEMENTARIA", "ANUAL"},
-                {"Cuche", "BOMBEO", "TRIMESTRAL"},
-                {"Dren Ayalas", "BOMBEO", "TRIMESTRAL"},
-                {"Dren chorrito", "BOMBEO", "TRIMESTRAL"},
-                {"Dren Cuche", "BOMBEO", "TRIMESTRAL"},
-                {"Dren Duitama", "BOMBEO", "TRIMESTRAL"},
-                {"Dren Jardines", "BOMBEO", "TRIMESTRAL"},
-                {"Dren Suescun", "BOMBEO", "TRIMESTRAL"},
-                {"Dren Tocogua", "BOMBEO", "TRIMESTRAL"},
-                {"Duitama", "BOMBEO", "TRIMESTRAL"},
-                {"Fuente Salinas", "BOMBEO", "TRIMESTRAL"},
-                {"Holanda", "BOMBEO", "TRIMESTRAL"},
-                {"La Copa", "COMPLEMENTARIA", "ANUAL"},
-                {"La Playa", "COMPLEMENTARIA", "ANUAL"},
-                {"Las Vueltas", "BOMBEO", "TRIMESTRAL"},
-                {"Ministerio", "BOMBEO", "TRIMESTRAL"},
-                {"Monquira", "BOMBEO", "TRIMESTRAL"},
-                {"Pantano de Vargas", "BOMBEO", "TRIMESTRAL"},
-                {"San Rafael", "BOMBEO", "TRIMESTRAL"},
-                {"Sede Administrativa", "COMPLEMENTARIA", "ANUAL"},
-                {"Surba", "BOMBEO", "TRIMESTRAL"},
-                {"Tibasosa", "BOMBEO", "TRIMESTRAL"},
-        };
-        Map<String, EstacionEntity> resultado = new HashMap<>();
-        for (String[] fila : datos) {
-            EstacionEntity guardada = estacionRepository.save(EstacionEntity.builder()
-                    .nombre(fila[0])
-                    .tipo(fila[1])
-                    .frecuenciaBase(fila[2])
-                    .status(true)
-                    .build());
-            resultado.put(fila[0].toUpperCase(), guardada);
-        }
-        return resultado;
+    // ---------------------------------------------------------------------
+    // Helpers de fixture sintético (sin relación con el seeder real V30)
+    // ---------------------------------------------------------------------
+
+    private EstacionEntity crearEstacion(String nombre) {
+        return estacionRepository.save(EstacionEntity.builder()
+                .nombre(nombre)
+                .tipo("BOMBEO")
+                .frecuenciaBase("TRIMESTRAL")
+                .status(true)
+                .build());
     }
 
-    /** Las 9 actividades CIVIL con captura_movil_habilitada=TRUE tras V30+V35 — V30 ya las trae así en el repo actual; V35 es la corrección idempotente para bases que tenían el seed viejo. */
-    private Map<String, ActividadEntity> sembrarActividadesCivilesCapturables(DisciplinaEntity civil) {
-        String[] nombres = {
-                "Corrección hallazgos sede administrativa/ CLAN",
-                "Inspección infraestructura presa La Copa y La Playa",
-                "Inspección maquinaria amarilla",
-                "Inspección sede administrativa/ CLAN",
-                "Inspección vehículos y motocicletas",
-                "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)",
-                "Inspección y mantenimiento compuertas + limpieza pozos succión",
-                "Pintura muros Estaciones (segun estado)",
-                "Pintura puertas/ventanas/barandas Estaciones",
-        };
-        Map<String, ActividadEntity> resultado = new HashMap<>();
-        for (String nombre : nombres) {
-            ActividadEntity guardada = actividadRepository.save(ActividadEntity.builder()
-                    .nombre(nombre)
-                    .disciplina(civil)
-                    .capturaMovilHabilitada(true)
-                    .status(true)
-                    .build());
-            resultado.put(nombre, guardada);
-        }
-        return resultado;
+    private ActividadEntity crearActividadCivilCapturable(String nombre) {
+        return actividadRepository.save(ActividadEntity.builder()
+                .nombre(nombre)
+                .disciplina(civil)
+                .capturaMovilHabilitada(true)
+                .status(true)
+                .build());
     }
 
-    /**
-     * 65 citas CIVIL de 2026 — subconjunto real (transcrito 1:1) de las 309 filas de
-     * mant_programacion sembradas por V30; incluye las 24 de "compuertas" (todo el año,
-     * repartidas en varias estaciones — no solo Duitama) que
-     * resumenPorActividad_devuelveLas9ActividadesCivilesConSuProgramacionAnual necesita
-     * para programadoAnual()==24, y las 2 de Duitama en el mes 2 ("compuertas" y
-     * "pintura puertas/ventanas/barandas") que usan los demás tests. No se siembran las
-     * 244 filas ELECTRICO/ELECTROMECANICO de V30: ningún test las necesita (el MVP solo
-     * captura CIVIL) y no sembrarlas no cambia ningún resultado verificado aquí.
-     */
-    private void sembrarProgramacionCivil2026(Map<String, EstacionEntity> estaciones, Map<String, ActividadEntity> actividades) {
-        Object[][] citas = {
-                {2, "SURBA", "Pintura puertas/ventanas/barandas Estaciones"},
-                {2, "HOLANDA", "Pintura puertas/ventanas/barandas Estaciones"},
-                {2, "PANTANO DE VARGAS", "Pintura puertas/ventanas/barandas Estaciones"},
-                {2, "FUENTE SALINAS", "Pintura puertas/ventanas/barandas Estaciones"},
-                {2, "AYALAS", "Pintura puertas/ventanas/barandas Estaciones"},
-                {2, "DUITAMA", "Pintura puertas/ventanas/barandas Estaciones"},
-                {3, "CUCHE", "Pintura puertas/ventanas/barandas Estaciones"},
-                {3, "TIBASOSA", "Pintura puertas/ventanas/barandas Estaciones"},
-                {3, "MINISTERIO", "Pintura puertas/ventanas/barandas Estaciones"},
-                {3, "MONQUIRA", "Pintura puertas/ventanas/barandas Estaciones"},
-                {3, "LAS VUELTAS", "Pintura puertas/ventanas/barandas Estaciones"},
-                {3, "SAN RAFAEL", "Pintura puertas/ventanas/barandas Estaciones"},
-
-                {7, "PANTANO DE VARGAS", "Pintura muros Estaciones (segun estado)"},
-                {7, "FUENTE SALINAS", "Pintura muros Estaciones (segun estado)"},
-                {8, "HOLANDA", "Pintura muros Estaciones (segun estado)"},
-                {8, "SURBA", "Pintura muros Estaciones (segun estado)"},
-                {9, "AYALAS", "Pintura muros Estaciones (segun estado)"},
-                {9, "DUITAMA", "Pintura muros Estaciones (segun estado)"},
-                {10, "CUCHE", "Pintura muros Estaciones (segun estado)"},
-                {10, "SAN RAFAEL", "Pintura muros Estaciones (segun estado)"},
-                {11, "LAS VUELTAS", "Pintura muros Estaciones (segun estado)"},
-                {11, "TIBASOSA", "Pintura muros Estaciones (segun estado)"},
-                {12, "MINISTERIO", "Pintura muros Estaciones (segun estado)"},
-                {12, "MONQUIRA", "Pintura muros Estaciones (segun estado)"},
-
-                {4, "HOLANDA", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {4, "PANTANO DE VARGAS", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {4, "FUENTE SALINAS", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {8, "DUITAMA", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {8, "LAS VUELTAS", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {8, "SAN RAFAEL", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {8, "AYALAS", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {12, "CUCHE", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {12, "TIBASOSA", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {12, "MINISTERIO", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-                {12, "MONQUIRA", "Inspección y mantenimiento cerchas/pasos elevados/limpieza malezas (segun estado)"},
-
-                {1, "SURBA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {1, "HOLANDA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {1, "PANTANO DE VARGAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {1, "FUENTE SALINAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {2, "DUITAMA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {2, "LAS VUELTAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {2, "SAN RAFAEL", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {2, "AYALAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {3, "CUCHE", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {3, "TIBASOSA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {3, "MINISTERIO", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {3, "MONQUIRA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {10, "SURBA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {10, "HOLANDA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {10, "PANTANO DE VARGAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {10, "FUENTE SALINAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {11, "DUITAMA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {11, "LAS VUELTAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {11, "SAN RAFAEL", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {11, "AYALAS", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {12, "CUCHE", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {12, "TIBASOSA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {12, "MINISTERIO", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-                {12, "MONQUIRA", "Inspección y mantenimiento compuertas + limpieza pozos succión"},
-
-                {6, "LA COPA", "Inspección infraestructura presa La Copa y La Playa"},
-                {6, "LA PLAYA", "Inspección infraestructura presa La Copa y La Playa"},
-
-                {5, "SEDE ADMINISTRATIVA", "Inspección sede administrativa/ CLAN"},
-                {7, "CLAN", "Inspección sede administrativa/ CLAN"},
-
-                {5, "SEDE ADMINISTRATIVA", "Corrección hallazgos sede administrativa/ CLAN"},
-                {7, "CLAN", "Corrección hallazgos sede administrativa/ CLAN"},
-        };
-
-        for (Object[] cita : citas) {
-            Integer mes = (Integer) cita[0];
-            String estacionNombre = (String) cita[1];
-            String actividadNombre = (String) cita[2];
-            programacionRepository.save(ProgramacionEntity.builder()
-                    .anio(2026)
-                    .mes(mes)
-                    .estacion(estaciones.get(estacionNombre))
-                    .actividad(actividades.get(actividadNombre))
-                    .status(true)
-                    .build());
-        }
+    private ProgramacionEntity programar(EstacionEntity estacion, ActividadEntity actividad, int anio, int mes) {
+        return programacionRepository.save(ProgramacionEntity.builder()
+                .anio(anio)
+                .mes(mes)
+                .estacion(estacion)
+                .actividad(actividad)
+                .status(true)
+                .build());
     }
+
+    // ---------------------------------------------------------------------
+    // Tests
+    // ---------------------------------------------------------------------
 
     @Test
-    void listarEstaciones_devuelveLas23SembradasEnV30() {
+    void listarEstaciones_devuelveTodasLasCreadas() {
         List<EstacionResponse> estaciones = catalogUseCase.listarEstaciones();
-        assertEquals(23, estaciones.size());
-        assertTrue(estaciones.stream().anyMatch(e -> e.nombre().equals("Duitama")));
+        assertEquals(3, estaciones.size());
+        assertTrue(estaciones.stream().anyMatch(e -> e.nombre().equals(estacionUno.getNombre())));
+        assertTrue(estaciones.stream().anyMatch(e -> e.nombre().equals(estacionDos.getNombre())));
+        assertTrue(estaciones.stream().anyMatch(e -> e.nombre().equals(estacionTres.getNombre())));
     }
 
     @Test
-    void listarActividadesCapturables_civilDevuelveLas9HabilitadasPorV35() {
+    void listarActividadesCapturables_filtraPorDisciplinaYCapturaMovilHabilitada() {
+        // Actividad CIVIL pero no capturable, y actividad capturable de otra disciplina:
+        // ninguna de las dos debe aparecer en el filtro por CIVIL capturables.
+        actividadRepository.save(ActividadEntity.builder()
+                .nombre("Actividad Civil No Capturable")
+                .disciplina(civil)
+                .capturaMovilHabilitada(false)
+                .status(true)
+                .build());
+        DisciplinaEntity otraDisciplina = disciplinaRepository.save(DisciplinaEntity.builder().codigo("ELECTRICO").build());
+        actividadRepository.save(ActividadEntity.builder()
+                .nombre("Actividad Eléctrica Capturable")
+                .disciplina(otraDisciplina)
+                .capturaMovilHabilitada(true)
+                .status(true)
+                .build());
+
         var actividades = catalogUseCase.listarActividadesCapturables("CIVIL");
-        assertEquals(9, actividades.size());
-        assertTrue(actividades.stream().anyMatch(a -> a.nombre().equals("Inspección maquinaria amarilla")));
+
+        assertEquals(2, actividades.size());
+        assertTrue(actividades.stream().anyMatch(a -> a.nombre().equals(actividadUno.getNombre())));
+        assertTrue(actividades.stream().anyMatch(a -> a.nombre().equals(actividadDos.getNombre())));
+        assertFalse(actividades.stream().anyMatch(a -> a.nombre().equals("Actividad Civil No Capturable")));
+        assertFalse(actividades.stream().anyMatch(a -> a.nombre().equals("Actividad Eléctrica Capturable")));
     }
 
     @Test
-    void listarProgramacion_encuentraLasCitasRealesDeDuitamaMes2() {
-        // Duitama en 2026-02 tiene 2 citas CIVIL reales sembradas en V30: compuertas y pintura.
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
-        List<ProgramacionResponse> citas = catalogUseCase.listarProgramacion(estacionId, 2026, 2, "CIVIL");
+    void listarProgramacion_filtraPorEstacionAnioMesYDisciplina() {
+        programar(estacionUno, actividadUno, 2030, 5);
+        programar(estacionUno, actividadDos, 2030, 5);
+        programar(estacionUno, actividadUno, 2030, 6); // otro mes, no debe aparecer
+        programar(estacionDos, actividadUno, 2030, 5); // otra estación, no debe aparecer
+
+        List<ProgramacionResponse> citas = catalogUseCase.listarProgramacion(estacionUno.getId(), 2030, 5, "CIVIL");
+
         assertEquals(2, citas.size());
-        assertTrue(citas.stream().anyMatch(c ->
-                c.actividadNombre().equals("Inspección y mantenimiento compuertas + limpieza pozos succión")));
+        assertTrue(citas.stream().anyMatch(c -> c.actividadNombre().equals(actividadUno.getNombre())));
+        assertTrue(citas.stream().anyMatch(c -> c.actividadNombre().equals(actividadDos.getNombre())));
     }
 
     @Test
-    void registrarEjecucion_desdeUnaCitaReal_marcaEsProgramadaYQuedaConsultable() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
-        var cita = catalogUseCase.listarProgramacion(estacionId, 2026, 2, "CIVIL").stream()
-                .filter(c -> c.actividadNombre().equals("Inspección y mantenimiento compuertas + limpieza pozos succión"))
-                .findFirst()
-                .orElseThrow();
+    void registrarEjecucion_desdeUnaCitaProgramada_marcaEsProgramadaYQuedaConsultable() {
+        ProgramacionEntity cita = programar(estacionUno, actividadUno, 2030, 2);
 
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.of(2026, 2, 15), 2, 3, estacionId, "CIVIL",
+                LocalDate.of(2030, 2, 15), 2, 3, estacionUno.getId(), "CIVIL",
                 "PREVENTIVO", "MANTENIMIENTO",
-                cita.actividadId(), cita.id(), null,
-                "CONFORME", "Compuertas limpias y lubricadas.", null,
+                actividadUno.getId(), cita.getId(), null,
+                "CONFORME", "Todo en orden.", null,
                 UUID.randomUUID());
 
         EjecucionResponse guardada = ejecucionUseCase.registrarEjecucion(request, usuario);
 
         assertNotNull(guardada.id());
         assertTrue(guardada.esProgramada());
-        assertEquals("Duitama", guardada.estacionNombre());
+        assertEquals(estacionUno.getNombre(), guardada.estacionNombre());
         assertEquals("tecnico.test", guardada.responsable());
 
         EjecucionResponse recuperada = ejecucionUseCase.obtenerEjecucion(guardada.id());
@@ -456,10 +366,8 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void registrarEjecucion_actividadNoPrevista_exigeMotivoYDescripcion() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
-
         EjecucionRequest sinMotivo = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "MANTENIMIENTO",
                 null, null, null,
                 "CONFORME", "obs", null,
@@ -468,7 +376,7 @@ class SubstationServiceIntegrationTest {
         assertThrows(BadRequestException.class, () -> ejecucionUseCase.registrarEjecucion(sinMotivo, usuario));
 
         EjecucionRequest completo = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "MANTENIMIENTO",
                 null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "Se pintó una baranda que se estaba oxidando.",
@@ -482,10 +390,9 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void registrarEjecucion_esIdempotentePorUuidCliente() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         UUID uuidCliente = UUID.randomUUID();
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "MANTENIMIENTO",
                 null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "algo no catalogado",
@@ -499,9 +406,8 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void agregarEvidencia_seGuardaYApareceEnElDetalle() throws Exception {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "INSPECCION",
                 null, null, "NO_PROGRAMADO",
                 "CON_HALLAZGOS", "obs", "revision de rutina",
@@ -522,9 +428,8 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void registrarEjecucion_rechazaTipoActividadOtroParaCivil() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "OTRO",
                 null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "algo",
@@ -535,9 +440,8 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void registrarEjecucion_rechazaMotivoNoCatalogadoOtroParaCivil() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "MANTENIMIENTO",
                 null, null, "OTRO",
                 "CONFORME", "obs", "algo no catalogado",
@@ -548,9 +452,8 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void editarEjecucion_actualizaCamposYQuedaEnElHistorial() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "INSPECCION",
                 null, null, "NO_PROGRAMADO",
                 "CON_HALLAZGOS", "obs original", "revision de rutina",
@@ -574,9 +477,8 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void editarEjecucion_exigeMotivoDeAlMenos15Caracteres() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.now(), 9, 1, estacionId, "CIVIL",
+                LocalDate.now(), 9, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "INSPECCION",
                 null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "algo",
@@ -593,29 +495,24 @@ class SubstationServiceIntegrationTest {
 
     @Test
     void obtenerEjecucionPorProgramacion_devuelveLaEjecucionDeEsaCita() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
-        var cita = catalogUseCase.listarProgramacion(estacionId, 2026, 2, "CIVIL").stream()
-                .filter(c -> c.actividadNombre().equals("Inspección y mantenimiento compuertas + limpieza pozos succión"))
-                .findFirst()
-                .orElseThrow();
+        ProgramacionEntity cita = programar(estacionUno, actividadUno, 2030, 2);
 
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.of(2026, 2, 15), 2, 3, estacionId, "CIVIL",
+                LocalDate.of(2030, 2, 15), 2, 3, estacionUno.getId(), "CIVIL",
                 "PREVENTIVO", "MANTENIMIENTO",
-                cita.actividadId(), cita.id(), null,
-                "CONFORME", "Compuertas limpias y lubricadas.", null,
+                actividadUno.getId(), cita.getId(), null,
+                "CONFORME", "Todo en orden.", null,
                 UUID.randomUUID());
         EjecucionResponse creada = ejecucionUseCase.registrarEjecucion(request, usuario);
 
-        EjecucionResponse encontrada = ejecucionUseCase.obtenerEjecucionPorProgramacion(cita.id());
+        EjecucionResponse encontrada = ejecucionUseCase.obtenerEjecucionPorProgramacion(cita.getId());
         assertEquals(creada.id(), encontrada.id());
     }
 
     @Test
     void listarEjecuciones_filtraPorEstacionYFecha() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.of(2026, 3, 1), 3, 1, estacionId, "CIVIL",
+                LocalDate.of(2030, 3, 1), 3, 1, estacionUno.getId(), "CIVIL",
                 "NO_PROGRAMADO", "INSPECCION",
                 null, null, "NO_PROGRAMADO",
                 "CONFORME", "obs", "algo",
@@ -623,28 +520,24 @@ class SubstationServiceIntegrationTest {
         ejecucionUseCase.registrarEjecucion(request, usuario);
 
         var pagina = ejecucionUseCase.listarEjecuciones(
-                estacionId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), PageRequest.of(0, 10));
+                estacionUno.getId(), LocalDate.of(2030, 1, 1), LocalDate.of(2030, 12, 31), PageRequest.of(0, 10));
 
         assertTrue(pagina.getTotalElements() >= 1);
-        assertTrue(pagina.getContent().stream().allMatch(e -> e.estacionId().equals(estacionId)));
+        assertTrue(pagina.getContent().stream().allMatch(e -> e.estacionId().equals(estacionUno.getId())));
     }
 
     @Test
     void cumplimientoPorMes_reflejaLaEjecucionRecienRegistrada() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
-        var cita = catalogUseCase.listarProgramacion(estacionId, 2026, 2, "CIVIL").stream()
-                .filter(c -> c.actividadNombre().equals("Inspección y mantenimiento compuertas + limpieza pozos succión"))
-                .findFirst()
-                .orElseThrow();
+        ProgramacionEntity cita = programar(estacionUno, actividadUno, 2030, 2);
 
-        List<CumplimientoResponse> antes = indicadoresUseCase.cumplimientoPorMes(2026, 2, "CIVIL");
-        assertTrue(antes.stream().anyMatch(c -> c.programacionId().equals(cita.id()) && !c.cumple()));
+        List<CumplimientoResponse> antes = indicadoresUseCase.cumplimientoPorMes(2030, 2, "CIVIL");
+        assertTrue(antes.stream().anyMatch(c -> c.programacionId().equals(cita.getId()) && !c.cumple()));
 
         EjecucionRequest request = new EjecucionRequest(
-                LocalDate.of(2026, 2, 15), 2, 3, estacionId, "CIVIL",
+                LocalDate.of(2030, 2, 15), 2, 3, estacionUno.getId(), "CIVIL",
                 "PREVENTIVO", "MANTENIMIENTO",
-                cita.actividadId(), cita.id(), null,
-                "CONFORME", "Compuertas limpias y lubricadas.", null,
+                actividadUno.getId(), cita.getId(), null,
+                "CONFORME", "Todo en orden.", null,
                 UUID.randomUUID());
         ejecucionUseCase.registrarEjecucion(request, usuario);
 
@@ -658,9 +551,9 @@ class SubstationServiceIntegrationTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<CumplimientoResponse> despues = indicadoresUseCase.cumplimientoPorMes(2026, 2, "CIVIL");
+        List<CumplimientoResponse> despues = indicadoresUseCase.cumplimientoPorMes(2030, 2, "CIVIL");
         CumplimientoResponse fila = despues.stream()
-                .filter(c -> c.programacionId().equals(cita.id()))
+                .filter(c -> c.programacionId().equals(cita.getId()))
                 .findFirst()
                 .orElseThrow();
         assertTrue(fila.cumple());
@@ -668,34 +561,44 @@ class SubstationServiceIntegrationTest {
     }
 
     @Test
-    void cumplimientoPorEstacion_devuelveTodoElAnioDeUnaEstacion() {
-        Long estacionId = buscarEstacionIdPorNombre("Duitama");
-        List<CumplimientoResponse> citas = indicadoresUseCase.cumplimientoPorEstacion(estacionId, 2026, "CIVIL");
-        assertFalse(citas.isEmpty());
-        assertTrue(citas.stream().allMatch(c -> c.estacionId().equals(estacionId)));
+    void cumplimientoPorEstacion_devuelveSoloLasCitasDeEsaEstacion() {
+        programar(estacionUno, actividadUno, 2030, 2);
+        programar(estacionUno, actividadDos, 2030, 8);
+        programar(estacionDos, actividadUno, 2030, 2); // otra estación, no debe aparecer
+
+        List<CumplimientoResponse> citas = indicadoresUseCase.cumplimientoPorEstacion(estacionUno.getId(), 2030, "CIVIL");
+
+        assertEquals(2, citas.size());
+        assertTrue(citas.stream().allMatch(c -> c.estacionId().equals(estacionUno.getId())));
     }
 
     @Test
-    void indicadoresPorEstacion_incluyeLas23EstacionesConSuPorcentaje() {
+    void indicadoresPorEstacion_incluyeTodasLasEstacionesActivasConSuProgramado() {
+        programar(estacionUno, actividadUno, 2030, 2);
+        // estacionDos y estacionTres quedan sin programación: deben seguir apareciendo con programado=0.
+
         List<IndicadorEstacionResponse> indicadores = indicadoresUseCase.indicadoresPorEstacion();
-        assertEquals(23, indicadores.size());
-        assertTrue(indicadores.stream().anyMatch(i -> i.estacionNombre().equals("Duitama") && i.programado() > 0));
+
+        assertEquals(3, indicadores.size());
+        assertTrue(indicadores.stream().anyMatch(
+                i -> i.estacionNombre().equals(estacionUno.getNombre()) && i.programado() > 0));
+        assertTrue(indicadores.stream().anyMatch(
+                i -> i.estacionNombre().equals(estacionDos.getNombre()) && i.programado() == 0));
     }
 
     @Test
-    void resumenPorActividad_devuelveLas9ActividadesCivilesConSuProgramacionAnual() {
-        List<ResumenActividadResponse> resumen = indicadoresUseCase.resumenPorActividad("CIVIL");
-        assertEquals(9, resumen.size());
-        assertTrue(resumen.stream().anyMatch(r ->
-                r.actividadNombre().equals("Inspección y mantenimiento compuertas + limpieza pozos succión")
-                        && r.programadoAnual() == 24));
-    }
+    void resumenPorActividad_devuelveLasActividadesCivilesConSuProgramacionAnual() {
+        programar(estacionUno, actividadUno, 2030, 1);
+        programar(estacionDos, actividadUno, 2030, 2);
+        programar(estacionTres, actividadUno, 2030, 3);
+        // actividadDos no tiene ninguna cita programada: debe aparecer con programadoAnual=0.
 
-    private Long buscarEstacionIdPorNombre(String nombre) {
-        return catalogUseCase.listarEstaciones().stream()
-                .filter(e -> e.nombre().equals(nombre))
-                .map(EstacionResponse::id)
-                .findFirst()
-                .orElseThrow();
+        List<ResumenActividadResponse> resumen = indicadoresUseCase.resumenPorActividad("CIVIL");
+
+        assertEquals(2, resumen.size());
+        assertTrue(resumen.stream().anyMatch(r ->
+                r.actividadNombre().equals(actividadUno.getNombre()) && r.programadoAnual() == 3));
+        assertTrue(resumen.stream().anyMatch(r ->
+                r.actividadNombre().equals(actividadDos.getNombre()) && r.programadoAnual() == 0));
     }
 }
